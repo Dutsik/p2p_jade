@@ -1,18 +1,20 @@
 package pro.meshnet.jade_p2p;
 
-
 import java.util.LinkedList;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
 import jade.core.Runtime;
 import jade.core.Profile;
 import jade.core.ProfileImpl;
 import jade.wrapper.*;
-import pro.meshnet.jade_p2p.util.AgentParams;
+
 import java.util.Arrays;
+
+import pro.meshnet.jade_p2p.util.AgentParams;
 
 public class App 
 {
@@ -24,48 +26,45 @@ public class App
             conn = DriverManager.getConnection("jdbc:sqlite:../graph.db");
             Statement s = conn.createStatement();
             ResultSet rs = s.executeQuery("SELECT * FROM graphs");
-            while (rs.next()) {
-                String[] nodes = rs.getString("nodes").split(";",0);
-                int id = rs.getInt("id");
-                AgentParams [] params = genArgs (rs.getString("edges"), nodes.length);
-                AgentController [] agents = new AgentController [nodes.length];
-                jade.core.Runtime rt = jade.core.Runtime.instance();
-                //rt.setCloseVM(true);
-                Profile p = new ProfileImpl();
-                ContainerController cc = rt.createMainContainer(p);
-                try {
-                    for (int i = 0 ;i<params.length; i++) {
-                        Object [] arg = new Object[1];
-                        arg[0] = params[i].getConnections();
-                        agents[i] = cc.createNewAgent(nodes[i].split(",",0)[0], "pro.meshnet.jade_p2p.broadcast.BroadCastAgent", arg);
-                        agents[i].start();    
-                    }
-                    for (int i = 0; i<params.length; i++) {
-                        agents[i].putO2AObject(params[i].getMessageCount(), false);
-                    }
-                    boolean weAreOnTheWay = true;
-                    while (weAreOnTheWay) {
-                        Thread.sleep(1000);
-                        weAreOnTheWay = false;
-                        for (AgentController a : agents)
-                            try {
-                            if (a.getState().getCode() ==  AgentState.cAGENT_STATE_ACTIVE)
-                                weAreOnTheWay = true;
-                            } catch (StaleProxyException e) {
-                            }
-                    }
-                    Thread.sleep(1000);
-                    for (int i = 0; i < params.length; i++)
-                        System.out.println(Arrays.toString(params[i].getMessageCount()));
-                    recordMessageCount (conn, params, id);
-                    rt.shutDown();
-                    cc.kill();
-                } catch (StaleProxyException e) {
-                    e.printStackTrace();
+            rs.next();
+            String[] nodes = rs.getString("nodes").split(";",0);
+            int id = rs.getInt("id");
+            AgentParams [] params = genArgs (rs.getString("edges"), nodes.length);
+            AgentController [] agents = new AgentController [nodes.length];
+            Runtime rt = Runtime.instance();
+            rt.setCloseVM(true);
+            Profile p = new ProfileImpl();
+            ContainerController cc = rt.createMainContainer(p);
+            try {
+                for (int i = 0 ;i<params.length; i++) {
+                    Object [] arg = new Object[1];
+                    arg[0] = params[i].getConnections();
+                    agents[i] = cc.createNewAgent(nodes[i].split(",",0)[0], "pro.meshnet.jade_p2p.broadcast.BroadCastAgent", arg);
+                    agents[i].start();    
                 }
+                for (int i = 0; i<params.length; i++) {
+                    agents[i].putO2AObject(params[i].getMessageCount(), false);
+                }
+                boolean weAreOnTheWay = true;
+                while (weAreOnTheWay) {
+                    Thread.sleep(1000);
+                    weAreOnTheWay = false;
+                    for (AgentController a : agents)
+                        try {
+                        if (a.getState().getCode() ==  AgentState.cAGENT_STATE_ACTIVE)
+                            weAreOnTheWay = true;
+                        } catch (StaleProxyException e) {
+                        }
+                }
+                Thread.sleep(1000);
+                for (int i = 0; i < params.length; i++)
+                    System.out.println(Arrays.toString(params[i].getMessageCount()));
+                recordMessageCount (conn, params, id);
+                rt.shutDown();
+                cc.kill();
+            } catch (StaleProxyException e) {
+                e.printStackTrace();
             }
-            java.lang.Runtime runtime = java.lang.Runtime.getRuntime();
-            runtime.halt(1); 
         } catch (SQLException e) {
             System.err.println(e.getMessage());
         } finally {
